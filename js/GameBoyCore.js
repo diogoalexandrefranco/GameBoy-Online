@@ -5721,6 +5721,9 @@ GameBoyCore.prototype.run = function () {
 	if ((this.stopEmulator & 2) == 0) {
 		if ((this.stopEmulator & 1) == 1) {
 			if (!this.CPUStopped) {
+
+				startMeasuringTime(); //AVE
+
 				this.stopEmulator = 0;
 				this.audioUnderrunAdjustment();
 				this.clockUpdate();			//RTC clocking.
@@ -5740,6 +5743,8 @@ GameBoyCore.prototype.run = function () {
 				}
 				//Request the graphics target to be updated:
 				this.requestDraw();
+
+				stopMeasuringTime(); //AVE
 			}
 			else {
 				this.audioUnderrunAdjustment();
@@ -5774,6 +5779,7 @@ GameBoyCore.prototype.executeIteration = function () {
 		}
 		//Fetch the current opcode:
 		opcodeToExecute = this.memoryReader[this.programCounter](this, this.programCounter);
+		
 		//Increment the program counter to the next instruction:
 		this.programCounter = (this.programCounter + 1) & 0xFFFF;
 		//Check for the program counter quirk:
@@ -5781,10 +5787,22 @@ GameBoyCore.prototype.executeIteration = function () {
 			this.programCounter = (this.programCounter - 1) & 0xFFFF;
 			this.skipPCIncrement = false;
 		}
+
+		/* AVE
+		This method was used to find the most common executed opcodes.
+		This is commented so that it doesn't introduce overhead.
+		countNewInstruction(opcodeToExecute);//AVE
+		*/
+
 		//Get how many CPU cycles the current instruction counts for:
 		this.CPUTicks = this.TICKTable[opcodeToExecute];
+
+
 		//Execute the current instruction:
 		this.OPCODE[opcodeToExecute](this);
+
+		numberOfInstructionsMeasured++; //AVE
+
 		//Update the state (Inlined updateCoreFull manually here):
 		//Update the clocking for the LCD emulation:
 		this.LCDTicks += this.CPUTicks >> this.doubleSpeedShifter;	//LCD Timing
