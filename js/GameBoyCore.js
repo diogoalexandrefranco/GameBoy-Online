@@ -20,6 +20,14 @@ function GameBoyCore(canvas, ROMImage) {
 	this.drawContext = null;					// LCD Context
 	this.ROMImage = ROMImage;					//The game's ROM. 
 	//CPU Registers and Flags:
+	this.lastopcode = 0; //AVE
+	this.lastregisterA = 0x01; //AVE
+	this.lastregisterB = 0x00; //AVE
+	this.lastregisterC = 0x13; //AVE
+	this.lastregisterD = 0x00; //AVE
+	this.lastregisterE = 0xD8; //AVE
+	this.lastDirtySum = 0; //AVE
+	this.lastregistersHL = 0x014D; //AVE	
 	this.registerA = 0x01; 						//Register A (Accumulator)
 	this.FZero = true; 							//Register F  - Result was zero
 	this.FSubtract = false;						//Register F  - Subtraction was executed
@@ -297,6 +305,119 @@ GameBoyCore.prototype.ffxxDump = [	//Dump of the post-BOOT I/O register state (F
 	0x98, 0xD1, 0x71, 0x02, 0x4D, 0x01, 0xC1, 0xFF, 	0x0D, 0x00, 0xD3, 0x05, 0xF9, 0x00, 0x0B, 0x00
 ];
 
+/* //AVE these are the methods that calculate FSubtract, FHalfCarry
+and FZero when needed */
+GameBoyCore.prototype.calcFSubtract = function(){ //AVE
+	switch(this.lastopcode){
+		case 4:
+			return false;
+		case 5:
+			return true;
+		case 7: 
+			return false;
+		case 12:
+			return false;
+		case 13:
+			return true;
+		case 15:
+			return false;
+		case 28:
+			return false;
+		case 60:
+			return false;
+		case 61:
+			return true;
+		case 175:
+			return true;
+		case 176:
+			return false;
+		case 177:
+			return false;
+		case 183:
+			return false;
+		case 241:
+			return ((this.lastDirtySum & 0x40) == 0x40);
+		case 254:
+			return true;
+		default:
+			return this.FSubtract;
+	}
+}
+
+GameBoyCore.prototype.calcFHalfCarry = function(){ //AVE
+	switch(this.lastopcode){
+		case 4:
+			return ((this.lastregisterB & 0xF) == 0xF);
+		case 5:
+			return ((this.lastregisterB & 0xF) == 0xF);
+		case 7: 
+			return false;
+		case 12:
+			return ((this.lastregisterC & 0xF) == 0);
+		case 13:
+			return ((this.lastregisterC & 0xF) == 0xF);
+		case 15:
+			return false;
+		case 28:
+			return ((this.lastregisterE & 0xF) == 0);
+		case 60:
+			return ((this.lastregisterA & 0xF) == 0xF)
+		case 61:
+			return ((this.lastregisterA & 0xF) == 0xF);
+		case 175:
+			return true;
+		case 176:
+			return false;
+		case 177:
+			return false;
+		case 183:
+			return false;
+		case 241:
+			return ((this.lastDirtySum & 0x20) == 0x20);
+		case 254:
+			return ((this.lastDirtySum & 0xF) > (this.lastregisterA & 0xF));
+		default:
+			return this.FHalfCarry;
+	}
+}
+
+GameBoyCore.prototype.calcFZero = function(){ //AVE
+	switch(this.lastopcode){
+		case 4:
+			return (this.lastregisterB == 0);
+		case 5:
+			return (this.lastregisterB == 0);
+		case 7: 
+			return false;
+		case 12:
+			return (this.lastregisterC == 0);
+		case 13:
+			return (this.lastregisterC == 0);
+		case 15:
+			return false;
+		case 28:
+			return (this.lastregisterE == 0);
+		case 60:
+			return (this.lastregisterA == 0);
+		case 61:
+			return (this.lastregisterA == 0);
+		case 175:
+			return true;
+		case 176:
+			return (this.lastregisterA == 0);
+		case 177:
+			return (this.lastregisterA == 0);
+		case 183:
+			return (this.lastregisterA == 0);
+		case 241:
+			return (this.lastDirtySum > 0x7F);
+		case 254:
+			return (this.lastDirtySum == 0);
+		default:
+			return this.FZero;
+	}
+}
+
 
 GameBoyCore.prototype.OPCODE = [
 	//NOP
@@ -319,6 +440,7 @@ GameBoyCore.prototype.OPCODE = [
 	//INC BC
 	//#0x03:
 	function (parentObj) {
+
 		var temp_var = ((parentObj.registerB << 8) | parentObj.registerC) + 1;
 		parentObj.registerB = (temp_var >> 8) & 0xFF;
 		parentObj.registerC = temp_var & 0xFF;
@@ -326,18 +448,25 @@ GameBoyCore.prototype.OPCODE = [
 	//INC B
 	//#0x04:
 	function (parentObj) {
+		parentObj.lastopcode = 4; //AVE
 		parentObj.registerB = (parentObj.registerB + 1) & 0xFF;
+		parentObj.lastregisterB = parentObj.registerB; //AVE
+		
+		/* 
 		parentObj.FZero = (parentObj.registerB == 0);
 		parentObj.FHalfCarry = ((parentObj.registerB & 0xF) == 0);
-		parentObj.FSubtract = false;
+		parentObj.FSubtract = false; */ //AVE
 	},
 	//DEC B
 	//#0x05:
 	function (parentObj) {
+		parentObj.lastopcode = 5; //AVE
 		parentObj.registerB = (parentObj.registerB - 1) & 0xFF;
-		parentObj.FZero = (parentObj.registerB == 0);
+		parentObj.lastregisterB = parentObj.registerB;
+		
+		/*parentObj.FZero = (parentObj.registerB == 0);
 		parentObj.FHalfCarry = ((parentObj.registerB & 0xF) == 0xF);
-		parentObj.FSubtract = true;
+		parentObj.FSubtract = true;*/ //AVE
 	},
 	//LD B, n
 	//#0x06:
@@ -348,9 +477,12 @@ GameBoyCore.prototype.OPCODE = [
 	//RLCA
 	//#0x07:
 	function (parentObj) {
+		parentObj.lastopcode = 7; //AVE
 		parentObj.FCarry = (parentObj.registerA > 0x7F);
 		parentObj.registerA = ((parentObj.registerA << 1) & 0xFF) | (parentObj.registerA >> 7);
-		parentObj.FZero = parentObj.FSubtract = parentObj.FHalfCarry = false;
+		
+
+		//AVE parentObj.FZero = parentObj.FSubtract = parentObj.FHalfCarry = false;
 	},
 	//LD (nn), SP
 	//#0x08:
@@ -363,6 +495,8 @@ GameBoyCore.prototype.OPCODE = [
 	//ADD HL, BC
 	//#0x09:
 	function (parentObj) {
+		parentObj.FZero = parentObj.calcFZero(); //AVE
+		parentObj.lastopcode = 9; //AVE
 		var dirtySum = parentObj.registersHL + ((parentObj.registerB << 8) | parentObj.registerC);
 		parentObj.FHalfCarry = ((parentObj.registersHL & 0xFFF) > (dirtySum & 0xFFF));
 		parentObj.FCarry = (dirtySum > 0xFFFF);
@@ -384,18 +518,26 @@ GameBoyCore.prototype.OPCODE = [
 	//INC C
 	//#0x0C:
 	function (parentObj) {
+		parentObj.lastopcode = 12; //AVE
 		parentObj.registerC = (parentObj.registerC + 1) & 0xFF;
+		parentObj.lastregisterC = parentObj.registerC; //AVE
+
+		/*
 		parentObj.FZero = (parentObj.registerC == 0);
 		parentObj.FHalfCarry = ((parentObj.registerC & 0xF) == 0);
-		parentObj.FSubtract = false;
+		parentObj.FSubtract = false;*/ //AVE
 	},
 	//DEC C
 	//#0x0D:
 	function (parentObj) {
+		parentObj.lastopcode = 13; //AVE
 		parentObj.registerC = (parentObj.registerC - 1) & 0xFF;
+		parentObj.lastregisterC = parentObj.registerC; //AVE
+		
+		/*
 		parentObj.FZero = (parentObj.registerC == 0);
 		parentObj.FHalfCarry = ((parentObj.registerC & 0xF) == 0xF);
-		parentObj.FSubtract = true;
+		parentObj.FSubtract = true;*/ //AVE
 	},
 	//LD C, n
 	//#0x0E:
@@ -406,9 +548,11 @@ GameBoyCore.prototype.OPCODE = [
 	//RRCA
 	//#0x0F:
 	function (parentObj) {
+		parentObj.lastopcode = 15; //AVE
 		parentObj.registerA = (parentObj.registerA >> 1) | ((parentObj.registerA & 1) << 7);
 		parentObj.FCarry = (parentObj.registerA > 0x7F);
-		parentObj.FZero = parentObj.FSubtract = parentObj.FHalfCarry = false;
+
+		/*parentObj.FZero = parentObj.FSubtract = parentObj.FHalfCarry = false;*/ //AVE
 	},
 	//STOP
 	//#0x10:
@@ -457,6 +601,7 @@ GameBoyCore.prototype.OPCODE = [
 	//INC D
 	//#0x14:
 	function (parentObj) {
+		parentObj.lastopcode = 20;
 		parentObj.registerD = (parentObj.registerD + 1) & 0xFF;
 		parentObj.FZero = (parentObj.registerD == 0);
 		parentObj.FHalfCarry = ((parentObj.registerD & 0xF) == 0);
@@ -465,6 +610,7 @@ GameBoyCore.prototype.OPCODE = [
 	//DEC D
 	//#0x15:
 	function (parentObj) {
+		parentObj.lastopcode = 21;
 		parentObj.registerD = (parentObj.registerD - 1) & 0xFF;
 		parentObj.FZero = (parentObj.registerD == 0);
 		parentObj.FHalfCarry = ((parentObj.registerD & 0xF) == 0xF);
@@ -479,6 +625,7 @@ GameBoyCore.prototype.OPCODE = [
 	//RLA
 	//#0x17:
 	function (parentObj) {
+		parentObj.lastopcode = 23;
 		var carry_flag = parentObj.FCarry | 0;
 		parentObj.FCarry = (parentObj.registerA > 0x7F);
 		parentObj.registerA = ((parentObj.registerA << 1) & 0xFF) | carry_flag;
@@ -492,6 +639,8 @@ GameBoyCore.prototype.OPCODE = [
 	//ADD HL, DE
 	//#0x19:
 	function (parentObj) {
+		parentObj.FZero = parentObj.calcFZero(); //AVE
+		parentObj.lastopcode = 25;
 		var dirtySum = parentObj.registersHL + ((parentObj.registerD << 8) | parentObj.registerE);
 		parentObj.FHalfCarry = ((parentObj.registersHL & 0xFFF) > (dirtySum & 0xFFF));
 		parentObj.FCarry = (dirtySum > 0xFFFF);
@@ -513,14 +662,19 @@ GameBoyCore.prototype.OPCODE = [
 	//INC E
 	//#0x1C:
 	function (parentObj) {
+		parentObj.lastopcode = 28; //AVE
 		parentObj.registerE = (parentObj.registerE + 1) & 0xFF;
+		parentObj.lastregisterE = parentObj.registerE; //AVE
+
+		/*
 		parentObj.FZero = (parentObj.registerE == 0);
 		parentObj.FHalfCarry = ((parentObj.registerE & 0xF) == 0);
-		parentObj.FSubtract = false;
+		parentObj.FSubtract = false;*/ //AVE
 	},
 	//DEC E
 	//#0x1D:
 	function (parentObj) {
+		parentObj.lastopcode = 29;
 		parentObj.registerE = (parentObj.registerE - 1) & 0xFF;
 		parentObj.FZero = (parentObj.registerE == 0);
 		parentObj.FHalfCarry = ((parentObj.registerE & 0xF) == 0xF);
@@ -535,6 +689,7 @@ GameBoyCore.prototype.OPCODE = [
 	//RRA
 	//#0x1F:
 	function (parentObj) {
+		parentObj.lastopcode = 31;
 		parentObj.FCarry = ((parentObj.registerA & 1) == 1);
 		parentObj.registerA = (parentObj.registerA >> 1) | (parentObj.FCarry << 7);
 		parentObj.FZero = parentObj.FSubtract = parentObj.FHalfCarry = false;
@@ -542,7 +697,7 @@ GameBoyCore.prototype.OPCODE = [
 	//JR NZ, n
 	//#0x20:
 	function (parentObj) {
-		if (!parentObj.FZero) {
+		if (!parentObj.calcFZero()) {
 			parentObj.programCounter = (parentObj.programCounter + ((parentObj.memoryReader[parentObj.programCounter](parentObj, parentObj.programCounter) << 24) >> 24) + 1) & 0xFFFF;
 			parentObj.CPUTicks += 4;
 		}
@@ -570,6 +725,7 @@ GameBoyCore.prototype.OPCODE = [
 	//INC H
 	//#0x24:
 	function (parentObj) {
+		parentObj.lastopcode = 36;
 		var H = ((parentObj.registersHL >> 8) + 1) & 0xFF;
 		parentObj.FZero = (H == 0);
 		parentObj.FHalfCarry = ((H & 0xF) == 0);
@@ -579,6 +735,7 @@ GameBoyCore.prototype.OPCODE = [
 	//DEC H
 	//#0x25:
 	function (parentObj) {
+		parentObj.lastopcode = 37;
 		var H = ((parentObj.registersHL >> 8) - 1) & 0xFF;
 		parentObj.FZero = (H == 0);
 		parentObj.FHalfCarry = ((H & 0xF) == 0xF);
@@ -594,6 +751,9 @@ GameBoyCore.prototype.OPCODE = [
 	//DAA
 	//#0x27:
 	function (parentObj) {
+		parentObj.lastopcode = 39;
+		parentObj.FSubtract = parentObj.calcFSubtract(); //AVE
+		parentObj.FHalfCarry = parentObj.calcFHalfCarry(); //AVE
 		if (!parentObj.FSubtract) {
 			if (parentObj.FCarry || parentObj.registerA > 0x99) {
 				parentObj.registerA = (parentObj.registerA + 0x60) & 0xFF;
@@ -620,7 +780,7 @@ GameBoyCore.prototype.OPCODE = [
 	//JR Z, n
 	//#0x28:
 	function (parentObj) {
-		if (parentObj.FZero) {
+		if (parentObj.calcFZero()) {
 			parentObj.programCounter = (parentObj.programCounter + ((parentObj.memoryReader[parentObj.programCounter](parentObj, parentObj.programCounter) << 24) >> 24) + 1) & 0xFFFF;
 			parentObj.CPUTicks += 4;
 		}
@@ -631,6 +791,8 @@ GameBoyCore.prototype.OPCODE = [
 	//ADD HL, HL
 	//#0x29:
 	function (parentObj) {
+		parentObj.FZero = parentObj.calcFZero(); //AVE
+		parentObj.lastopcode = 41;
 		parentObj.FHalfCarry = ((parentObj.registersHL & 0xFFF) > 0x7FF);
 		parentObj.FCarry = (parentObj.registersHL > 0x7FFF);
 		parentObj.registersHL = (parentObj.registersHL << 1) & 0xFFFF;
@@ -650,6 +812,7 @@ GameBoyCore.prototype.OPCODE = [
 	//INC L
 	//#0x2C:
 	function (parentObj) {
+		parentObj.lastopcode = 44;
 		var L = (parentObj.registersHL + 1) & 0xFF;
 		parentObj.FZero = (L == 0);
 		parentObj.FHalfCarry = ((L & 0xF) == 0);
@@ -659,6 +822,7 @@ GameBoyCore.prototype.OPCODE = [
 	//DEC L
 	//#0x2D:
 	function (parentObj) {
+		parentObj.lastopcode = 45;
 		var L = (parentObj.registersHL - 1) & 0xFF;
 		parentObj.FZero = (L == 0);
 		parentObj.FHalfCarry = ((L & 0xF) == 0xF);
@@ -674,6 +838,8 @@ GameBoyCore.prototype.OPCODE = [
 	//CPL
 	//#0x2F:
 	function (parentObj) {
+		parentObj.FZero = parentObj.calcFZero(); //AVE
+		parentObj.lastopcode = 47;
 		parentObj.registerA ^= 0xFF;
 		parentObj.FSubtract = parentObj.FHalfCarry = true;
 	},
@@ -708,6 +874,7 @@ GameBoyCore.prototype.OPCODE = [
 	//INC (HL)
 	//#0x34:
 	function (parentObj) {
+		parentObj.lastopcode = 52;
 		var temp_var = (parentObj.memoryReader[parentObj.registersHL](parentObj, parentObj.registersHL) + 1) & 0xFF;
 		parentObj.FZero = (temp_var == 0);
 		parentObj.FHalfCarry = ((temp_var & 0xF) == 0);
@@ -717,6 +884,7 @@ GameBoyCore.prototype.OPCODE = [
 	//DEC (HL)
 	//#0x35:
 	function (parentObj) {
+		parentObj.lastopcode = 53;
 		var temp_var = (parentObj.memoryReader[parentObj.registersHL](parentObj, parentObj.registersHL) - 1) & 0xFF;
 		parentObj.FZero = (temp_var == 0);
 		parentObj.FHalfCarry = ((temp_var & 0xF) == 0xF);
@@ -732,6 +900,7 @@ GameBoyCore.prototype.OPCODE = [
 	//SCF
 	//#0x37:
 	function (parentObj) {
+		parentObj.lastopcode = 55;
 		parentObj.FCarry = true;
 		parentObj.FSubtract = parentObj.FHalfCarry = false;
 	},
@@ -749,6 +918,8 @@ GameBoyCore.prototype.OPCODE = [
 	//ADD HL, SP
 	//#0x39:
 	function (parentObj) {
+		parentObj.FZero = parentObj.calcFZero(); //AVE
+		parentObj.lastopcode = 57;
 		var dirtySum = parentObj.registersHL + parentObj.stackPointer;
 		parentObj.FHalfCarry = ((parentObj.registersHL & 0xFFF) > (dirtySum & 0xFFF));
 		parentObj.FCarry = (dirtySum > 0xFFFF);
@@ -769,18 +940,25 @@ GameBoyCore.prototype.OPCODE = [
 	//INC A
 	//#0x3C:
 	function (parentObj) {
+		parentObj.lastopcode = 60; //AVE
 		parentObj.registerA = (parentObj.registerA + 1) & 0xFF;
+		parentObj.lastregisterA = parentObj.registerA; //AVE
+
+		/*
 		parentObj.FZero = (parentObj.registerA == 0);
 		parentObj.FHalfCarry = ((parentObj.registerA & 0xF) == 0);
-		parentObj.FSubtract = false;
+		parentObj.FSubtract = false;*/ //AVE
 	},
 	//DEC A
 	//#0x3D:
 	function (parentObj) {
+		parentObj.lastopcode = 61; //AVE
 		parentObj.registerA = (parentObj.registerA - 1) & 0xFF;
-		parentObj.FZero = (parentObj.registerA == 0);
+		parentObj.lastregisterA = parentObj.registerA; //AVE
+		
+		/*parentObj.FZero = (parentObj.registerA == 0);
 		parentObj.FHalfCarry = ((parentObj.registerA & 0xF) == 0xF);
-		parentObj.FSubtract = true;
+		parentObj.FSubtract = true;*/ //AVE
 	},
 	//LD A, n
 	//#0x3E:
@@ -791,6 +969,8 @@ GameBoyCore.prototype.OPCODE = [
 	//CCF
 	//#0x3F:
 	function (parentObj) {
+		parentObj.FZero = parentObj.calcFZero(); //AVE
+		parentObj.lastopcode = 63; //AVE
 		parentObj.FCarry = !parentObj.FCarry;
 		parentObj.FSubtract = parentObj.FHalfCarry = false;
 	},
@@ -1131,6 +1311,7 @@ GameBoyCore.prototype.OPCODE = [
 	//ADD A, B
 	//#0x80:
 	function (parentObj) {
+		parentObj.lastopcode = 128; //AVE
 		var dirtySum = parentObj.registerA + parentObj.registerB;
 		parentObj.FHalfCarry = ((dirtySum & 0xF) < (parentObj.registerA & 0xF));
 		parentObj.FCarry = (dirtySum > 0xFF);
@@ -1141,6 +1322,7 @@ GameBoyCore.prototype.OPCODE = [
 	//ADD A, C
 	//#0x81:
 	function (parentObj) {
+		parentObj.lastopcode = 129; //AVE
 		var dirtySum = parentObj.registerA + parentObj.registerC;
 		parentObj.FHalfCarry = ((dirtySum & 0xF) < (parentObj.registerA & 0xF));
 		parentObj.FCarry = (dirtySum > 0xFF);
@@ -1151,6 +1333,7 @@ GameBoyCore.prototype.OPCODE = [
 	//ADD A, D
 	//#0x82:
 	function (parentObj) {
+		parentObj.lastopcode = 130; //AVE
 		var dirtySum = parentObj.registerA + parentObj.registerD;
 		parentObj.FHalfCarry = ((dirtySum & 0xF) < (parentObj.registerA & 0xF));
 		parentObj.FCarry = (dirtySum > 0xFF);
@@ -1161,6 +1344,7 @@ GameBoyCore.prototype.OPCODE = [
 	//ADD A, E
 	//#0x83:
 	function (parentObj) {
+		parentObj.lastopcode = 131; //AVE
 		var dirtySum = parentObj.registerA + parentObj.registerE;
 		parentObj.FHalfCarry = ((dirtySum & 0xF) < (parentObj.registerA & 0xF));
 		parentObj.FCarry = (dirtySum > 0xFF);
@@ -1171,6 +1355,7 @@ GameBoyCore.prototype.OPCODE = [
 	//ADD A, H
 	//#0x84:
 	function (parentObj) {
+		parentObj.lastopcode = 132; //AVE
 		var dirtySum = parentObj.registerA + (parentObj.registersHL >> 8);
 		parentObj.FHalfCarry = ((dirtySum & 0xF) < (parentObj.registerA & 0xF));
 		parentObj.FCarry = (dirtySum > 0xFF);
@@ -1181,6 +1366,7 @@ GameBoyCore.prototype.OPCODE = [
 	//ADD A, L
 	//#0x85:
 	function (parentObj) {
+		parentObj.lastopcode = 133;
 		var dirtySum = parentObj.registerA + (parentObj.registersHL & 0xFF);
 		parentObj.FHalfCarry = ((dirtySum & 0xF) < (parentObj.registerA & 0xF));
 		parentObj.FCarry = (dirtySum > 0xFF);
@@ -1191,6 +1377,7 @@ GameBoyCore.prototype.OPCODE = [
 	//ADD A, (HL)
 	//#0x86:
 	function (parentObj) {
+		parentObj.lastopcode = 134;
 		var dirtySum = parentObj.registerA + parentObj.memoryReader[parentObj.registersHL](parentObj, parentObj.registersHL);
 		parentObj.FHalfCarry = ((dirtySum & 0xF) < (parentObj.registerA & 0xF));
 		parentObj.FCarry = (dirtySum > 0xFF);
@@ -1201,6 +1388,7 @@ GameBoyCore.prototype.OPCODE = [
 	//ADD A, A
 	//#0x87:
 	function (parentObj) {
+		parentObj.lastopcode = 135;
 		parentObj.FHalfCarry = ((parentObj.registerA & 0x8) == 0x8);
 		parentObj.FCarry = (parentObj.registerA > 0x7F);
 		parentObj.registerA = (parentObj.registerA << 1) & 0xFF;
@@ -1210,6 +1398,7 @@ GameBoyCore.prototype.OPCODE = [
 	//ADC A, B
 	//#0x88:
 	function (parentObj) {
+		parentObj.lastopcode = 136;
 		var dirtySum = parentObj.registerA + parentObj.registerB + (parentObj.FCarry | 0);
 		parentObj.FHalfCarry = ((parentObj.registerA & 0xF) + (parentObj.registerB & 0xF) + (parentObj.FCarry | 0) > 0xF);
 		parentObj.FCarry = (dirtySum > 0xFF);
@@ -1220,6 +1409,7 @@ GameBoyCore.prototype.OPCODE = [
 	//ADC A, C
 	//#0x89:
 	function (parentObj) {
+		parentObj.lastopcode = 137;
 		var dirtySum = parentObj.registerA + parentObj.registerC + (parentObj.FCarry | 0);
 		parentObj.FHalfCarry = ((parentObj.registerA & 0xF) + (parentObj.registerC & 0xF) + (parentObj.FCarry | 0) > 0xF);
 		parentObj.FCarry = (dirtySum > 0xFF);
@@ -1230,6 +1420,7 @@ GameBoyCore.prototype.OPCODE = [
 	//ADC A, D
 	//#0x8A:
 	function (parentObj) {
+		parentObj.lastopcode = 138;
 		var dirtySum = parentObj.registerA + parentObj.registerD + (parentObj.FCarry | 0);
 		parentObj.FHalfCarry = ((parentObj.registerA & 0xF) + (parentObj.registerD & 0xF) + (parentObj.FCarry | 0) > 0xF);
 		parentObj.FCarry = (dirtySum > 0xFF);
@@ -1240,6 +1431,7 @@ GameBoyCore.prototype.OPCODE = [
 	//ADC A, E
 	//#0x8B:
 	function (parentObj) {
+		parentObj.lastopcode = 139;
 		var dirtySum = parentObj.registerA + parentObj.registerE + (parentObj.FCarry | 0);
 		parentObj.FHalfCarry = ((parentObj.registerA & 0xF) + (parentObj.registerE & 0xF) + (parentObj.FCarry | 0) > 0xF);
 		parentObj.FCarry = (dirtySum > 0xFF);
@@ -1250,6 +1442,7 @@ GameBoyCore.prototype.OPCODE = [
 	//ADC A, H
 	//#0x8C:
 	function (parentObj) {
+		parentObj.lastopcode = 140;
 		var tempValue = (parentObj.registersHL >> 8);
 		var dirtySum = parentObj.registerA + tempValue + (parentObj.FCarry | 0);
 		parentObj.FHalfCarry = ((parentObj.registerA & 0xF) + (tempValue & 0xF) + (parentObj.FCarry | 0) > 0xF);
@@ -1261,6 +1454,7 @@ GameBoyCore.prototype.OPCODE = [
 	//ADC A, L
 	//#0x8D:
 	function (parentObj) {
+		parentObj.lastopcode = 141;
 		var tempValue = (parentObj.registersHL & 0xFF);
 		var dirtySum = parentObj.registerA + tempValue + (parentObj.FCarry | 0);
 		parentObj.FHalfCarry = ((parentObj.registerA & 0xF) + (tempValue & 0xF) + (parentObj.FCarry | 0) > 0xF);
@@ -1272,6 +1466,7 @@ GameBoyCore.prototype.OPCODE = [
 	//ADC A, (HL)
 	//#0x8E:
 	function (parentObj) {
+		parentObj.lastopcode = 142;
 		var tempValue = parentObj.memoryReader[parentObj.registersHL](parentObj, parentObj.registersHL);
 		var dirtySum = parentObj.registerA + tempValue + (parentObj.FCarry | 0);
 		parentObj.FHalfCarry = ((parentObj.registerA & 0xF) + (tempValue & 0xF) + (parentObj.FCarry | 0) > 0xF);
@@ -1283,6 +1478,7 @@ GameBoyCore.prototype.OPCODE = [
 	//ADC A, A
 	//#0x8F:
 	function (parentObj) {
+		parentObj.lastopcode = 143;
 		//shift left register A one bit for some ops here as an optimization:
 		var dirtySum = (parentObj.registerA << 1) | (parentObj.FCarry | 0);
 		parentObj.FHalfCarry = ((((parentObj.registerA << 1) & 0x1E) | (parentObj.FCarry | 0)) > 0xF);
@@ -1294,6 +1490,7 @@ GameBoyCore.prototype.OPCODE = [
 	//SUB A, B
 	//#0x90:
 	function (parentObj) {
+		parentObj.lastopcode = 144;
 		var dirtySum = parentObj.registerA - parentObj.registerB;
 		parentObj.FHalfCarry = ((parentObj.registerA & 0xF) < (dirtySum & 0xF));
 		parentObj.FCarry = (dirtySum < 0);
@@ -1304,6 +1501,7 @@ GameBoyCore.prototype.OPCODE = [
 	//SUB A, C
 	//#0x91:
 	function (parentObj) {
+		parentObj.lastopcode = 145;
 		var dirtySum = parentObj.registerA - parentObj.registerC;
 		parentObj.FHalfCarry = ((parentObj.registerA & 0xF) < (dirtySum & 0xF));
 		parentObj.FCarry = (dirtySum < 0);
@@ -1314,6 +1512,7 @@ GameBoyCore.prototype.OPCODE = [
 	//SUB A, D
 	//#0x92:
 	function (parentObj) {
+		parentObj.lastopcode = 146;
 		var dirtySum = parentObj.registerA - parentObj.registerD;
 		parentObj.FHalfCarry = ((parentObj.registerA & 0xF) < (dirtySum & 0xF));
 		parentObj.FCarry = (dirtySum < 0);
@@ -1324,6 +1523,7 @@ GameBoyCore.prototype.OPCODE = [
 	//SUB A, E
 	//#0x93:
 	function (parentObj) {
+		parentObj.lastopcode = 147;
 		var dirtySum = parentObj.registerA - parentObj.registerE;
 		parentObj.FHalfCarry = ((parentObj.registerA & 0xF) < (dirtySum & 0xF));
 		parentObj.FCarry = (dirtySum < 0);
@@ -1334,6 +1534,7 @@ GameBoyCore.prototype.OPCODE = [
 	//SUB A, H
 	//#0x94:
 	function (parentObj) {
+		parentObj.lastopcode = 148;
 		var dirtySum = parentObj.registerA - (parentObj.registersHL >> 8);
 		parentObj.FHalfCarry = ((parentObj.registerA & 0xF) < (dirtySum & 0xF));
 		parentObj.FCarry = (dirtySum < 0);
@@ -1344,6 +1545,7 @@ GameBoyCore.prototype.OPCODE = [
 	//SUB A, L
 	//#0x95:
 	function (parentObj) {
+		parentObj.lastopcode = 149;
 		var dirtySum = parentObj.registerA - (parentObj.registersHL & 0xFF);
 		parentObj.FHalfCarry = ((parentObj.registerA & 0xF) < (dirtySum & 0xF));
 		parentObj.FCarry = (dirtySum < 0);
@@ -1354,6 +1556,7 @@ GameBoyCore.prototype.OPCODE = [
 	//SUB A, (HL)
 	//#0x96:
 	function (parentObj) {
+		parentObj.lastopcode = 150;
 		var dirtySum = parentObj.registerA - parentObj.memoryReader[parentObj.registersHL](parentObj, parentObj.registersHL);
 		parentObj.FHalfCarry = ((parentObj.registerA & 0xF) < (dirtySum & 0xF));
 		parentObj.FCarry = (dirtySum < 0);
@@ -1364,6 +1567,7 @@ GameBoyCore.prototype.OPCODE = [
 	//SUB A, A
 	//#0x97:
 	function (parentObj) {
+		parentObj.lastopcode = 151;
 		//number - same number == 0
 		parentObj.registerA = 0;
 		parentObj.FHalfCarry = parentObj.FCarry = false;
@@ -1372,6 +1576,7 @@ GameBoyCore.prototype.OPCODE = [
 	//SBC A, B
 	//#0x98:
 	function (parentObj) {
+		parentObj.lastopcode = 152;
 		var dirtySum = parentObj.registerA - parentObj.registerB - (parentObj.FCarry | 0);
 		parentObj.FHalfCarry = ((parentObj.registerA & 0xF) - (parentObj.registerB & 0xF) - (parentObj.FCarry | 0) < 0);
 		parentObj.FCarry = (dirtySum < 0);
@@ -1382,6 +1587,7 @@ GameBoyCore.prototype.OPCODE = [
 	//SBC A, C
 	//#0x99:
 	function (parentObj) {
+		parentObj.lastopcode = 153;
 		var dirtySum = parentObj.registerA - parentObj.registerC - (parentObj.FCarry | 0);
 		parentObj.FHalfCarry = ((parentObj.registerA & 0xF) - (parentObj.registerC & 0xF) - (parentObj.FCarry | 0) < 0);
 		parentObj.FCarry = (dirtySum < 0);
@@ -1392,6 +1598,7 @@ GameBoyCore.prototype.OPCODE = [
 	//SBC A, D
 	//#0x9A:
 	function (parentObj) {
+		parentObj.lastopcode = 154;
 		var dirtySum = parentObj.registerA - parentObj.registerD - (parentObj.FCarry | 0);
 		parentObj.FHalfCarry = ((parentObj.registerA & 0xF) - (parentObj.registerD & 0xF) - (parentObj.FCarry | 0) < 0);
 		parentObj.FCarry = (dirtySum < 0);
@@ -1402,6 +1609,7 @@ GameBoyCore.prototype.OPCODE = [
 	//SBC A, E
 	//#0x9B:
 	function (parentObj) {
+		parentObj.lastopcode = 155;
 		var dirtySum = parentObj.registerA - parentObj.registerE - (parentObj.FCarry | 0);
 		parentObj.FHalfCarry = ((parentObj.registerA & 0xF) - (parentObj.registerE & 0xF) - (parentObj.FCarry | 0) < 0);
 		parentObj.FCarry = (dirtySum < 0);
@@ -1412,6 +1620,7 @@ GameBoyCore.prototype.OPCODE = [
 	//SBC A, H
 	//#0x9C:
 	function (parentObj) {
+		parentObj.lastopcode = 156;
 		var temp_var = parentObj.registersHL >> 8;
 		var dirtySum = parentObj.registerA - temp_var - (parentObj.FCarry | 0);
 		parentObj.FHalfCarry = ((parentObj.registerA & 0xF) - (temp_var & 0xF) - (parentObj.FCarry | 0) < 0);
@@ -1423,6 +1632,7 @@ GameBoyCore.prototype.OPCODE = [
 	//SBC A, L
 	//#0x9D:
 	function (parentObj) {
+		parentObj.lastopcode = 157;
 		var dirtySum = parentObj.registerA - (parentObj.registersHL & 0xFF) - (parentObj.FCarry | 0);
 		parentObj.FHalfCarry = ((parentObj.registerA & 0xF) - (parentObj.registersHL & 0xF) - (parentObj.FCarry | 0) < 0);
 		parentObj.FCarry = (dirtySum < 0);
@@ -1433,6 +1643,7 @@ GameBoyCore.prototype.OPCODE = [
 	//SBC A, (HL)
 	//#0x9E:
 	function (parentObj) {
+		parentObj.lastopcode = 158;
 		var temp_var = parentObj.memoryReader[parentObj.registersHL](parentObj, parentObj.registersHL);
 		var dirtySum = parentObj.registerA - temp_var - (parentObj.FCarry | 0);
 		parentObj.FHalfCarry = ((parentObj.registerA & 0xF) - (temp_var & 0xF) - (parentObj.FCarry | 0) < 0);
@@ -1444,6 +1655,7 @@ GameBoyCore.prototype.OPCODE = [
 	//SBC A, A
 	//#0x9F:
 	function (parentObj) {
+		parentObj.lastopcode = 159;
 		//Optimized SBC A:
 		if (parentObj.FCarry) {
 			parentObj.FZero = false;
@@ -1459,6 +1671,7 @@ GameBoyCore.prototype.OPCODE = [
 	//AND B
 	//#0xA0:
 	function (parentObj) {
+		parentObj.lastopcode = 160;
 		parentObj.registerA &= parentObj.registerB;
 		parentObj.FZero = (parentObj.registerA == 0);
 		parentObj.FHalfCarry = true;
@@ -1467,6 +1680,7 @@ GameBoyCore.prototype.OPCODE = [
 	//AND C
 	//#0xA1:
 	function (parentObj) {
+		parentObj.lastopcode = 161;
 		parentObj.registerA &= parentObj.registerC;
 		parentObj.FZero = (parentObj.registerA == 0);
 		parentObj.FHalfCarry = true;
@@ -1475,6 +1689,7 @@ GameBoyCore.prototype.OPCODE = [
 	//AND D
 	//#0xA2:
 	function (parentObj) {
+		parentObj.lastopcode = 162;
 		parentObj.registerA &= parentObj.registerD;
 		parentObj.FZero = (parentObj.registerA == 0);
 		parentObj.FHalfCarry = true;
@@ -1483,6 +1698,7 @@ GameBoyCore.prototype.OPCODE = [
 	//AND E
 	//#0xA3:
 	function (parentObj) {
+		parentObj.lastopcode = 163;
 		parentObj.registerA &= parentObj.registerE;
 		parentObj.FZero = (parentObj.registerA == 0);
 		parentObj.FHalfCarry = true;
@@ -1491,6 +1707,7 @@ GameBoyCore.prototype.OPCODE = [
 	//AND H
 	//#0xA4:
 	function (parentObj) {
+		parentObj.lastopcode = 164;
 		parentObj.registerA &= (parentObj.registersHL >> 8);
 		parentObj.FZero = (parentObj.registerA == 0);
 		parentObj.FHalfCarry = true;
@@ -1499,6 +1716,7 @@ GameBoyCore.prototype.OPCODE = [
 	//AND L
 	//#0xA5:
 	function (parentObj) {
+		parentObj.lastopcode = 165;
 		parentObj.registerA &= parentObj.registersHL;
 		parentObj.FZero = (parentObj.registerA == 0);
 		parentObj.FHalfCarry = true;
@@ -1507,6 +1725,7 @@ GameBoyCore.prototype.OPCODE = [
 	//AND (HL)
 	//#0xA6:
 	function (parentObj) {
+		parentObj.lastopcode = 166;
 		parentObj.registerA &= parentObj.memoryReader[parentObj.registersHL](parentObj, parentObj.registersHL);
 		parentObj.FZero = (parentObj.registerA == 0);
 		parentObj.FHalfCarry = true;
@@ -1515,6 +1734,7 @@ GameBoyCore.prototype.OPCODE = [
 	//AND A
 	//#0xA7:
 	function (parentObj) {
+		parentObj.lastopcode = 167;
 		//number & same number = same number
 		parentObj.FZero = (parentObj.registerA == 0);
 		parentObj.FHalfCarry = true;
@@ -1523,6 +1743,7 @@ GameBoyCore.prototype.OPCODE = [
 	//XOR B
 	//#0xA8:
 	function (parentObj) {
+		parentObj.lastopcode = 168;
 		parentObj.registerA ^= parentObj.registerB;
 		parentObj.FZero = (parentObj.registerA == 0);
 		parentObj.FSubtract = parentObj.FHalfCarry = parentObj.FCarry = false;
@@ -1530,6 +1751,7 @@ GameBoyCore.prototype.OPCODE = [
 	//XOR C
 	//#0xA9:
 	function (parentObj) {
+		parentObj.lastopcode = 169;
 		parentObj.registerA ^= parentObj.registerC;
 		parentObj.FZero = (parentObj.registerA == 0);
 		parentObj.FSubtract = parentObj.FHalfCarry = parentObj.FCarry = false;
@@ -1537,6 +1759,7 @@ GameBoyCore.prototype.OPCODE = [
 	//XOR D
 	//#0xAA:
 	function (parentObj) {
+		parentObj.lastopcode = 170;
 		parentObj.registerA ^= parentObj.registerD;
 		parentObj.FZero = (parentObj.registerA == 0);
 		parentObj.FSubtract = parentObj.FHalfCarry = parentObj.FCarry = false;
@@ -1544,6 +1767,7 @@ GameBoyCore.prototype.OPCODE = [
 	//XOR E
 	//#0xAB:
 	function (parentObj) {
+		parentObj.lastopcode = 171;
 		parentObj.registerA ^= parentObj.registerE;
 		parentObj.FZero = (parentObj.registerA == 0);
 		parentObj.FSubtract = parentObj.FHalfCarry = parentObj.FCarry = false;
@@ -1551,6 +1775,7 @@ GameBoyCore.prototype.OPCODE = [
 	//XOR H
 	//#0xAC:
 	function (parentObj) {
+		parentObj.lastopcode = 172;
 		parentObj.registerA ^= (parentObj.registersHL >> 8);
 		parentObj.FZero = (parentObj.registerA == 0);
 		parentObj.FSubtract = parentObj.FHalfCarry = parentObj.FCarry = false;
@@ -1558,6 +1783,7 @@ GameBoyCore.prototype.OPCODE = [
 	//XOR L
 	//#0xAD:
 	function (parentObj) {
+		parentObj.lastopcode = 173; //AVE
 		parentObj.registerA ^= (parentObj.registersHL & 0xFF);
 		parentObj.FZero = (parentObj.registerA == 0);
 		parentObj.FSubtract = parentObj.FHalfCarry = parentObj.FCarry = false;
@@ -1565,6 +1791,7 @@ GameBoyCore.prototype.OPCODE = [
 	//XOR (HL)
 	//#0xAE:
 	function (parentObj) {
+		parentObj.lastopcode = 174; //AVE
 		parentObj.registerA ^= parentObj.memoryReader[parentObj.registersHL](parentObj, parentObj.registersHL);
 		parentObj.FZero = (parentObj.registerA == 0);
 		parentObj.FSubtract = parentObj.FHalfCarry = parentObj.FCarry = false;
@@ -1572,28 +1799,40 @@ GameBoyCore.prototype.OPCODE = [
 	//XOR A
 	//#0xAF:
 	function (parentObj) {
+		parentObj.lastopcode = 175; //AVE
 		//number ^ same number == 0
 		parentObj.registerA = 0;
-		parentObj.FZero = true;
-		parentObj.FSubtract = parentObj.FHalfCarry = parentObj.FCarry = false;
+		parentObj.FCarry = false;
+
+		/*parentObj.FZero = true;
+		parentObj.FSubtract = parentObj.FHalfCarry = parentObj.FCarry = false;*/
 	},
 	//OR B
 	//#0xB0:
 	function (parentObj) {
+		parentObj.lastopcode = 176; //AVE
 		parentObj.registerA |= parentObj.registerB;
-		parentObj.FZero = (parentObj.registerA == 0);
-		parentObj.FSubtract = parentObj.FCarry = parentObj.FHalfCarry = false;
+		parentObj.lastregisterA = parentObj.registerA; //AVE
+		parentObj.FCarry = false;
+
+		/*parentObj.FZero = (parentObj.registerA == 0);
+		parentObj.FSubtract = parentObj.FCarry = parentObj.FHalfCarry = false;*/ //AVE
 	},
 	//OR C
 	//#0xB1:
 	function (parentObj) {
+		parentObj.lastopcode = 177; //AVE
 		parentObj.registerA |= parentObj.registerC;
-		parentObj.FZero = (parentObj.registerA == 0);
-		parentObj.FSubtract = parentObj.FCarry = parentObj.FHalfCarry = false;
+		parentObj.lastregisterA = parentObj.registerA; //AVE
+		parentObj.FCarry = false;
+
+		/*parentObj.FZero = (parentObj.registerA == 0);
+		parentObj.FSubtract = parentObj.FCarry = parentObj.FHalfCarry = false;*/ //AVE
 	},
 	//OR D
 	//#0xB2:
 	function (parentObj) {
+		parentObj.lastopcode = 178; //AVE
 		parentObj.registerA |= parentObj.registerD;
 		parentObj.FZero = (parentObj.registerA == 0);
 		parentObj.FSubtract = parentObj.FCarry = parentObj.FHalfCarry = false;
@@ -1601,6 +1840,7 @@ GameBoyCore.prototype.OPCODE = [
 	//OR E
 	//#0xB3:
 	function (parentObj) {
+		parentObj.lastopcode = 179; //AVE
 		parentObj.registerA |= parentObj.registerE;
 		parentObj.FZero = (parentObj.registerA == 0);
 		parentObj.FSubtract = parentObj.FCarry = parentObj.FHalfCarry = false;
@@ -1608,6 +1848,7 @@ GameBoyCore.prototype.OPCODE = [
 	//OR H
 	//#0xB4:
 	function (parentObj) {
+		parentObj.lastopcode = 180;
 		parentObj.registerA |= (parentObj.registersHL >> 8);
 		parentObj.FZero = (parentObj.registerA == 0);
 		parentObj.FSubtract = parentObj.FCarry = parentObj.FHalfCarry = false;
@@ -1615,6 +1856,7 @@ GameBoyCore.prototype.OPCODE = [
 	//OR L
 	//#0xB5:
 	function (parentObj) {
+		parentObj.lastopcode = 181;
 		parentObj.registerA |= (parentObj.registersHL & 0xFF);
 		parentObj.FZero = (parentObj.registerA == 0);
 		parentObj.FSubtract = parentObj.FCarry = parentObj.FHalfCarry = false;
@@ -1622,6 +1864,7 @@ GameBoyCore.prototype.OPCODE = [
 	//OR (HL)
 	//#0xB6:
 	function (parentObj) {
+		parentObj.lastopcode = 182;
 		parentObj.registerA |= parentObj.memoryReader[parentObj.registersHL](parentObj, parentObj.registersHL);
 		parentObj.FZero = (parentObj.registerA == 0);
 		parentObj.FSubtract = parentObj.FCarry = parentObj.FHalfCarry = false;
@@ -1629,13 +1872,18 @@ GameBoyCore.prototype.OPCODE = [
 	//OR A
 	//#0xB7:
 	function (parentObj) {
+		parentObj.lastopcode = 183;
+		parentObj.lastregisterA = parentObj.registerA; //AVE
+		parentObj.FCarry = false;
 		//number | same number == same number
-		parentObj.FZero = (parentObj.registerA == 0);
-		parentObj.FSubtract = parentObj.FCarry = parentObj.FHalfCarry = false;
+		
+		/*parentObj.FZero = (parentObj.registerA == 0);
+		parentObj.FSubtract = parentObj.FCarry = parentObj.FHalfCarry = false;*/ //AVE
 	},
 	//CP B
 	//#0xB8:
 	function (parentObj) {
+		parentObj.lastopcode = 184;
 		var dirtySum = parentObj.registerA - parentObj.registerB;
 		parentObj.FHalfCarry = ((dirtySum & 0xF) > (parentObj.registerA & 0xF));
 		parentObj.FCarry = (dirtySum < 0);
@@ -1645,6 +1893,7 @@ GameBoyCore.prototype.OPCODE = [
 	//CP C
 	//#0xB9:
 	function (parentObj) {
+		parentObj.lastopcode = 185;
 		var dirtySum = parentObj.registerA - parentObj.registerC;
 		parentObj.FHalfCarry = ((dirtySum & 0xF) > (parentObj.registerA & 0xF));
 		parentObj.FCarry = (dirtySum < 0);
@@ -1654,6 +1903,7 @@ GameBoyCore.prototype.OPCODE = [
 	//CP D
 	//#0xBA:
 	function (parentObj) {
+		parentObj.lastopcode = 186;
 		var dirtySum = parentObj.registerA - parentObj.registerD;
 		parentObj.FHalfCarry = ((dirtySum & 0xF) > (parentObj.registerA & 0xF));
 		parentObj.FCarry = (dirtySum < 0);
@@ -1663,6 +1913,7 @@ GameBoyCore.prototype.OPCODE = [
 	//CP E
 	//#0xBB:
 	function (parentObj) {
+		parentObj.lastopcode = 187;
 		var dirtySum = parentObj.registerA - parentObj.registerE;
 		parentObj.FHalfCarry = ((dirtySum & 0xF) > (parentObj.registerA & 0xF));
 		parentObj.FCarry = (dirtySum < 0);
@@ -1672,6 +1923,7 @@ GameBoyCore.prototype.OPCODE = [
 	//CP H
 	//#0xBC:
 	function (parentObj) {
+		parentObj.lastopcode = 188;
 		var dirtySum = parentObj.registerA - (parentObj.registersHL >> 8);
 		parentObj.FHalfCarry = ((dirtySum & 0xF) > (parentObj.registerA & 0xF));
 		parentObj.FCarry = (dirtySum < 0);
@@ -1681,6 +1933,7 @@ GameBoyCore.prototype.OPCODE = [
 	//CP L
 	//#0xBD:
 	function (parentObj) {
+		parentObj.lastopcode = 189;
 		var dirtySum = parentObj.registerA - (parentObj.registersHL & 0xFF);
 		parentObj.FHalfCarry = ((dirtySum & 0xF) > (parentObj.registerA & 0xF));
 		parentObj.FCarry = (dirtySum < 0);
@@ -1690,6 +1943,7 @@ GameBoyCore.prototype.OPCODE = [
 	//CP (HL)
 	//#0xBE:
 	function (parentObj) {
+		parentObj.lastopcode = 190;
 		var dirtySum = parentObj.registerA - parentObj.memoryReader[parentObj.registersHL](parentObj, parentObj.registersHL);
 		parentObj.FHalfCarry = ((dirtySum & 0xF) > (parentObj.registerA & 0xF));
 		parentObj.FCarry = (dirtySum < 0);
@@ -1699,13 +1953,14 @@ GameBoyCore.prototype.OPCODE = [
 	//CP A
 	//#0xBF:
 	function (parentObj) {
+		parentObj.lastopcode = 191;
 		parentObj.FHalfCarry = parentObj.FCarry = false;
 		parentObj.FZero = parentObj.FSubtract = true;
 	},
 	//RET !FZ
 	//#0xC0:
 	function (parentObj) {
-		if (!parentObj.FZero) {
+		if (!parentObj.calcFZero()) {
 			parentObj.programCounter = (parentObj.memoryRead((parentObj.stackPointer + 1) & 0xFFFF) << 8) | parentObj.memoryReader[parentObj.stackPointer](parentObj, parentObj.stackPointer);
 			parentObj.stackPointer = (parentObj.stackPointer + 2) & 0xFFFF;
 			parentObj.CPUTicks += 12;
@@ -1721,7 +1976,7 @@ GameBoyCore.prototype.OPCODE = [
 	//JP !FZ, nn
 	//#0xC2:
 	function (parentObj) {
-		if (!parentObj.FZero) {
+		if (!parentObj.calcFZero()) {
 			parentObj.programCounter = (parentObj.memoryRead((parentObj.programCounter + 1) & 0xFFFF) << 8) | parentObj.memoryReader[parentObj.programCounter](parentObj, parentObj.programCounter);
 			parentObj.CPUTicks += 4;
 		}
@@ -1737,7 +1992,7 @@ GameBoyCore.prototype.OPCODE = [
 	//CALL !FZ, nn
 	//#0xC4:
 	function (parentObj) {
-		if (!parentObj.FZero) {
+		if (!parentObj.calcFZero()) {
 			var temp_pc = (parentObj.memoryRead((parentObj.programCounter + 1) & 0xFFFF) << 8) | parentObj.memoryReader[parentObj.programCounter](parentObj, parentObj.programCounter);
 			parentObj.programCounter = (parentObj.programCounter + 2) & 0xFFFF;
 			parentObj.stackPointer = (parentObj.stackPointer - 1) & 0xFFFF;
@@ -1762,6 +2017,7 @@ GameBoyCore.prototype.OPCODE = [
 	//ADD, n
 	//#0xC6:
 	function (parentObj) {
+		parentObj.lastopcode = 198;
 		var dirtySum = parentObj.registerA + parentObj.memoryReader[parentObj.programCounter](parentObj, parentObj.programCounter);
 		parentObj.programCounter = (parentObj.programCounter + 1) & 0xFFFF;
 		parentObj.FHalfCarry = ((dirtySum & 0xF) < (parentObj.registerA & 0xF));
@@ -1782,7 +2038,7 @@ GameBoyCore.prototype.OPCODE = [
 	//RET FZ
 	//#0xC8:
 	function (parentObj) {
-		if (parentObj.FZero) {
+		if (parentObj.calcFZero()) {
 			parentObj.programCounter = (parentObj.memoryRead((parentObj.stackPointer + 1) & 0xFFFF) << 8) | parentObj.memoryReader[parentObj.stackPointer](parentObj, parentObj.stackPointer);
 			parentObj.stackPointer = (parentObj.stackPointer + 2) & 0xFFFF;
 			parentObj.CPUTicks += 12;
@@ -1797,7 +2053,7 @@ GameBoyCore.prototype.OPCODE = [
 	//JP FZ, nn
 	//#0xCA:
 	function (parentObj) {
-		if (parentObj.FZero) {
+		if (parentObj.calcFZero()) {
 			parentObj.programCounter = (parentObj.memoryRead((parentObj.programCounter + 1) & 0xFFFF) << 8) | parentObj.memoryReader[parentObj.programCounter](parentObj, parentObj.programCounter);
 			parentObj.CPUTicks += 4;
 		}
@@ -1808,6 +2064,7 @@ GameBoyCore.prototype.OPCODE = [
 	//Secondary OP Code Set:
 	//#0xCB:
 	function (parentObj) {
+		parentObj.lastopcode = 203;
 		var opcode = parentObj.memoryReader[parentObj.programCounter](parentObj, parentObj.programCounter);
 		//Increment the program counter to the next instruction:
 		parentObj.programCounter = (parentObj.programCounter + 1) & 0xFFFF;
@@ -1819,7 +2076,7 @@ GameBoyCore.prototype.OPCODE = [
 	//CALL FZ, nn
 	//#0xCC:
 	function (parentObj) {
-		if (parentObj.FZero) {
+		if (parentObj.calcFZero()) {
 			var temp_pc = (parentObj.memoryRead((parentObj.programCounter + 1) & 0xFFFF) << 8) | parentObj.memoryReader[parentObj.programCounter](parentObj, parentObj.programCounter);
 			parentObj.programCounter = (parentObj.programCounter + 2) & 0xFFFF;
 			parentObj.stackPointer = (parentObj.stackPointer - 1) & 0xFFFF;
@@ -1847,6 +2104,7 @@ GameBoyCore.prototype.OPCODE = [
 	//ADC A, n
 	//#0xCE:
 	function (parentObj) {
+		parentObj.lastopcode = 206;
 		var tempValue = parentObj.memoryReader[parentObj.programCounter](parentObj, parentObj.programCounter);
 		parentObj.programCounter = (parentObj.programCounter + 1) & 0xFFFF;
 		var dirtySum = parentObj.registerA + tempValue + (parentObj.FCarry | 0);
@@ -1926,6 +2184,7 @@ GameBoyCore.prototype.OPCODE = [
 	//SUB A, n
 	//#0xD6:
 	function (parentObj) {
+		parentObj.lastopcode = 214;
 		var dirtySum = parentObj.registerA - parentObj.memoryReader[parentObj.programCounter](parentObj, parentObj.programCounter);
 		parentObj.programCounter = (parentObj.programCounter + 1) & 0xFFFF;
 		parentObj.FHalfCarry = ((parentObj.registerA & 0xF) < (dirtySum & 0xF));
@@ -2003,6 +2262,7 @@ GameBoyCore.prototype.OPCODE = [
 	//SBC A, n
 	//#0xDE:
 	function (parentObj) {
+		parentObj.lastopcode = 222;
 		var temp_var = parentObj.memoryReader[parentObj.programCounter](parentObj, parentObj.programCounter);
 		parentObj.programCounter = (parentObj.programCounter + 1) & 0xFFFF;
 		var dirtySum = parentObj.registerA - temp_var - (parentObj.FCarry | 0);
@@ -2061,6 +2321,7 @@ GameBoyCore.prototype.OPCODE = [
 	//AND n
 	//#0xE6:
 	function (parentObj) {
+		parentObj.lastopcode = 230;
 		parentObj.registerA &= parentObj.memoryReader[parentObj.programCounter](parentObj, parentObj.programCounter);
 		parentObj.programCounter = (parentObj.programCounter + 1) & 0xFFFF;
 		parentObj.FZero = (parentObj.registerA == 0);
@@ -2079,6 +2340,7 @@ GameBoyCore.prototype.OPCODE = [
 	//ADD SP, n
 	//#0xE8:
 	function (parentObj) {
+		parentObj.lastopcode = 232;
 		var temp_value2 = (parentObj.memoryReader[parentObj.programCounter](parentObj, parentObj.programCounter) << 24) >> 24;
 		parentObj.programCounter = (parentObj.programCounter + 1) & 0xFFFF;
 		var temp_value = (parentObj.stackPointer + temp_value2) & 0xFFFF;
@@ -2120,6 +2382,7 @@ GameBoyCore.prototype.OPCODE = [
 	//XOR n
 	//#0xEE:
 	function (parentObj) {
+		parentObj.lastopcode = 238;
 		parentObj.registerA ^= parentObj.memoryReader[parentObj.programCounter](parentObj, parentObj.programCounter);
 		parentObj.programCounter = (parentObj.programCounter + 1) & 0xFFFF;
 		parentObj.FZero = (parentObj.registerA == 0);
@@ -2143,10 +2406,15 @@ GameBoyCore.prototype.OPCODE = [
 	//POP AF
 	//#0xF1:
 	function (parentObj) {
+		parentObj.lastopcode = 241; //AVE
 		var temp_var = parentObj.memoryReader[parentObj.stackPointer](parentObj, parentObj.stackPointer);
+		parentObj.lastDirtySum = temp_var; //AVE
+
+		/*
 		parentObj.FZero = (temp_var > 0x7F);
 		parentObj.FSubtract = ((temp_var & 0x40) == 0x40);
-		parentObj.FHalfCarry = ((temp_var & 0x20) == 0x20);
+		parentObj.FHalfCarry = ((temp_var & 0x20) == 0x20);*/ //AVE
+
 		parentObj.FCarry = ((temp_var & 0x10) == 0x10);
 		parentObj.registerA = parentObj.memoryRead((parentObj.stackPointer + 1) & 0xFFFF);
 		parentObj.stackPointer = (parentObj.stackPointer + 2) & 0xFFFF;
@@ -2174,11 +2442,12 @@ GameBoyCore.prototype.OPCODE = [
 		parentObj.stackPointer = (parentObj.stackPointer - 1) & 0xFFFF;
 		parentObj.memoryWriter[parentObj.stackPointer](parentObj, parentObj.stackPointer, parentObj.registerA);
 		parentObj.stackPointer = (parentObj.stackPointer - 1) & 0xFFFF;
-		parentObj.memoryWriter[parentObj.stackPointer](parentObj, parentObj.stackPointer, (parentObj.FZero << 7) | (parentObj.FSubtract << 6) | (parentObj.FHalfCarry << 5) | (parentObj.FCarry << 4));
+		parentObj.memoryWriter[parentObj.stackPointer](parentObj, parentObj.stackPointer, (parentObj.calcFZero() << 7) | (parentObj.calcFSubtract() << 6) | (parentObj.calcFHalfCarry() << 5) | (parentObj.FCarry << 4));
 	},
 	//OR n
 	//#0xF6:
 	function (parentObj) {
+		parentObj.lastopcode = 246;
 		parentObj.registerA |= parentObj.memoryReader[parentObj.programCounter](parentObj, parentObj.programCounter);
 		parentObj.FZero = (parentObj.registerA == 0);
 		parentObj.programCounter = (parentObj.programCounter + 1) & 0xFFFF;
@@ -2196,6 +2465,7 @@ GameBoyCore.prototype.OPCODE = [
 	//LDHL SP, n
 	//#0xF8:
 	function (parentObj) {
+		parentObj.lastopcode = 248;
 		var temp_var = (parentObj.memoryReader[parentObj.programCounter](parentObj, parentObj.programCounter) << 24) >> 24;
 		parentObj.programCounter = (parentObj.programCounter + 1) & 0xFFFF;
 		parentObj.registersHL = (parentObj.stackPointer + temp_var) & 0xFFFF;
@@ -2236,12 +2506,16 @@ GameBoyCore.prototype.OPCODE = [
 	//CP n
 	//#0xFE:
 	function (parentObj) {
+		parentObj.lastopcode = 254;
 		var dirtySum = parentObj.registerA - parentObj.memoryReader[parentObj.programCounter](parentObj, parentObj.programCounter);
+		parentObj.lastDirtySum = dirtySum;
+		parentObj.lastregisterA = parentObj.registerA;
 		parentObj.programCounter = (parentObj.programCounter + 1) & 0xFFFF;
-		parentObj.FHalfCarry = ((dirtySum & 0xF) > (parentObj.registerA & 0xF));
 		parentObj.FCarry = (dirtySum < 0);
+		
+		/*parentObj.FHalfCarry = ((dirtySum & 0xF) > (parentObj.registerA & 0xF));
 		parentObj.FZero = (dirtySum == 0);
-		parentObj.FSubtract = true;
+		parentObj.FSubtract = true;*/ //AVE
 	},
 	//RST 0x38
 	//#0xFF:
@@ -2253,6 +2527,7 @@ GameBoyCore.prototype.OPCODE = [
 		parentObj.programCounter = 0x38;
 	}
 ];
+
 GameBoyCore.prototype.CBOPCODE = [
 	//RLC B
 	//#0x00:

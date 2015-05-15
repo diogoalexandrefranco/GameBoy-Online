@@ -16,6 +16,12 @@ function countNewInstruction(opcode) {
 };
 
 
+
+/*
+* these functions and variables are used to measure
+* the time that the cpu is working as well as the number
+* of instructions executed by the emulator.
+*/
 var totalTime = 0;
 var t0 = 0;
 var t1 = 0;
