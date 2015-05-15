@@ -35,6 +35,7 @@ function run() {
 			var dateObj = new Date();
 			gameboy.firstIteration = dateObj.getTime();
 			gameboy.iterations = 0;
+			//startMeasuringTotalTime(); //AVE
 			gbRunInterval = setInterval(function () {
 				if (!document.hidden && !document.msHidden && !document.mozHidden && !document.webkitHidden) {
 					gameboy.run();
@@ -52,6 +53,7 @@ function run() {
 function pause() {
 	if (GameBoyEmulatorInitialized()) {
 		if (GameBoyEmulatorPlaying()) {
+			//stopMeasuringTotalTime(); //AVE
 			clearLastEmulation();
 		}
 		else {
